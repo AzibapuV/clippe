@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import ToastProvider from "@/components/ToastProvider";
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -36,7 +37,7 @@ export default function RootLayout({
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
       <body className="font-body antialiased">
         <div className="grain" aria-hidden="true" />
-        {children}
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );

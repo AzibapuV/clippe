@@ -79,4 +79,3 @@ prisma/
 - **Phase 5:** Billing (Stripe), usage credits enforcement, team/admin features
 
 Each phase will be handed to you as file updates to drop into this same repo.
-# clippe
