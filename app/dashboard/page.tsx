@@ -2,8 +2,9 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { Project } from "@prisma/client";
-import { Scissors, FolderPlus, Clock } from "lucide-react";
+import { Scissors, Clock } from "lucide-react";
+import NewProjectModal from "@/components/NewProjectModal";
+import ProjectGrid from "@/components/ProjectGrid";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -42,29 +43,10 @@ export default async function DashboardPage() {
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="flex items-center justify-between mb-8">
           <h1 className="font-display font-bold text-2xl">Your projects</h1>
-          <button className="flex items-center gap-2 bg-signal text-ink text-sm font-medium px-4 py-2.5 rounded-md hover:bg-signal/90 transition-colors">
-            <FolderPlus className="h-4 w-4" /> New project
-          </button>
+          <NewProjectModal />
         </div>
 
-        {projects.length === 0 ? (
-          <div className="border border-dashed border-ink-line rounded-xl p-16 text-center">
-            <p className="text-muted text-sm">
-              No projects yet. Create one and drop in a video or a link to start finding clips.
-            </p>
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-3 gap-4">
-            {projects.map((p: Project) => (
-              <div key={p.id} className="border border-ink-line rounded-xl p-5 hover:border-wave/50 transition-colors">
-                <h3 className="font-display font-bold">{p.name}</h3>
-                <p className="text-xs text-muted font-mono mt-2">
-                  {new Date(p.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
+        <ProjectGrid projects={projects} />
       </div>
     </main>
   );
