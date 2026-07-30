@@ -19,3 +19,7 @@ export async function saveUploadedVideo(file: File): Promise<{
 
   return { storageKey, absolutePath };
 }
+
+export function absolutePathForKey(storageKey: string): string {
+  return path.join(UPLOAD_ROOT, storageKey);
+}

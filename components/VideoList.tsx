@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { FileVideo, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { FileVideo, Clock, CheckCircle2, XCircle, ChevronRight } from "lucide-react";
 import type { Video } from "@prisma/client";
 import TimelineTrack from "@/components/TimelineTrack";
 
@@ -75,15 +76,10 @@ export default function VideoList({
       <AnimatePresence initial={false}>
         {videos.map((v) => {
           const inProgress = IN_PROGRESS_STATUSES.includes(v.status);
-          return (
-            <motion.div
-              key={v.id}
-              layout
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="relative flex items-center justify-between border border-ink-line rounded-xl pl-4 pr-5 py-4 overflow-hidden"
-            >
+          const clickable = v.status === "READY" && v.sourceType === "UPLOAD";
+
+          const rowInner = (
+            <>
               <span
                 className={`absolute left-0 top-0 bottom-0 w-1 ${
                   v.status === "READY"
@@ -114,7 +110,32 @@ export default function VideoList({
                 ) : (
                   <StatusMarker status={v.status} />
                 )}
+                {clickable && <ChevronRight className="h-4 w-4 text-muted" />}
               </div>
+            </>
+          );
+
+          const rowClass =
+            "relative flex items-center justify-between border border-ink-line rounded-xl pl-4 pr-5 py-4 overflow-hidden";
+
+          return (
+            <motion.div
+              key={v.id}
+              layout
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+            >
+              {clickable ? (
+                <Link
+                  href={`/videos/${v.id}`}
+                  className={`${rowClass} hover:border-wave/50 transition-colors`}
+                >
+                  {rowInner}
+                </Link>
+              ) : (
+                <div className={rowClass}>{rowInner}</div>
+              )}
             </motion.div>
           );
         })}
