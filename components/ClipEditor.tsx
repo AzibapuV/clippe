@@ -58,6 +58,41 @@ export default function ClipEditor({
   const [title, setTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [clips, setClips] = useState<ClipData[]>(initialClips);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  const watchForPreviewEnd = useCallback(() => {
+    const v = videoRef.current;
+    if (!v || v.paused || previewEndRef.current === null) {
+      rafRef.current = null;
+      return;
+    }
+    if (v.currentTime >= previewEndRef.current) {
+      v.pause();
+      previewEndRef.current = null;
+      rafRef.current = null;
+      return;
+    }
+    rafRef.current = requestAnimationFrame(watchForPreviewEnd);
+  }, []);
+
+  const playRange = useCallback(
+    (start: number, end: number) => {
+      const v = videoRef.current;
+      if (!v) return;
+      previewEndRef.current = end;
+      v.currentTime = start;
+      v.play();
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(watchForPreviewEnd);
+    },
+    [watchForPreviewEnd]
+  );
 
   const clientXToSeconds = useCallback(
     (clientX: number) => {
@@ -101,12 +136,7 @@ export default function ClipEditor({
   }
 
   function handleTimeUpdate() {
-    const t = videoRef.current?.currentTime ?? 0;
-    setCurrentTime(t);
-    if (previewEndRef.current !== null && t >= previewEndRef.current) {
-      videoRef.current?.pause();
-      previewEndRef.current = null;
-    }
+    setCurrentTime(videoRef.current?.currentTime ?? 0);
   }
 
   function seekTo(t: number) {
@@ -127,10 +157,7 @@ export default function ClipEditor({
   }
 
   function previewSelection() {
-    if (!videoRef.current) return;
-    previewEndRef.current = selEnd;
-    videoRef.current.currentTime = selStart;
-    videoRef.current.play();
+    playRange(selStart, selEnd);
   }
 
   function handleTrackClick(e: React.MouseEvent) {
@@ -354,11 +381,7 @@ export default function ClipEditor({
                   onClick={() => {
                     setSelStart(c.startSec);
                     setSelEnd(c.endSec);
-                    previewEndRef.current = c.endSec;
-                    if (videoRef.current) {
-                      videoRef.current.currentTime = c.startSec;
-                      videoRef.current.play();
-                    }
+                    playRange(c.startSec, c.endSec);
                   }}
                   className="flex items-center gap-3 min-w-0 text-left"
                 >
