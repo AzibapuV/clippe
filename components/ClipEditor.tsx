@@ -104,15 +104,35 @@ export default function ClipEditor({
     [duration]
   );
 
+  const selStartRef = useRef(selStart);
+  const selEndRef = useRef(selEnd);
+  useEffect(() => {
+    selStartRef.current = selStart;
+  }, [selStart]);
+  useEffect(() => {
+    selEndRef.current = selEnd;
+  }, [selEnd]);
+
+  function startDrag(handle: "start" | "end", e: React.PointerEvent) {
+    e.stopPropagation();
+    e.preventDefault();
+    (e.target as Element).setPointerCapture(e.pointerId);
+    setDragging(handle);
+  }
+
   useEffect(() => {
     if (!dragging) return;
 
     function onMove(e: PointerEvent) {
       const t = clientXToSeconds(e.clientX);
       if (dragging === "start") {
-        setSelStart(Math.min(t, selEnd - MIN_CLIP_LEN));
+        const next = Math.max(0, Math.min(t, selEndRef.current - MIN_CLIP_LEN));
+        selStartRef.current = next;
+        setSelStart(next);
       } else {
-        setSelEnd(Math.max(t, selStart + MIN_CLIP_LEN));
+        const next = Math.min(duration, Math.max(t, selStartRef.current + MIN_CLIP_LEN));
+        selEndRef.current = next;
+        setSelEnd(next);
       }
     }
     function onUp() {
@@ -121,11 +141,13 @@ export default function ClipEditor({
 
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
     };
-  }, [dragging, clientXToSeconds, selStart, selEnd]);
+  }, [dragging, clientXToSeconds, duration]);
 
   function handleLoadedMetadata() {
     const d = videoRef.current?.duration;
@@ -285,24 +307,18 @@ export default function ClipEditor({
           />
 
           <motion.div
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              setDragging("start");
-            }}
+            onPointerDown={(e) => startDrag("start", e)}
             whileTap={{ scale: 1.15 }}
-            className="absolute top-0 bottom-0 w-3 -ml-1.5 cursor-ew-resize flex items-center justify-center touch-none"
+            className="absolute top-0 bottom-0 w-6 -ml-3 cursor-ew-resize flex items-center justify-center touch-none"
             style={{ left: `${startPct}%` }}
           >
             <div className="h-full w-1 rounded-full bg-signal" />
           </motion.div>
 
           <motion.div
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              setDragging("end");
-            }}
+            onPointerDown={(e) => startDrag("end", e)}
             whileTap={{ scale: 1.15 }}
-            className="absolute top-0 bottom-0 w-3 -ml-1.5 cursor-ew-resize flex items-center justify-center touch-none"
+            className="absolute top-0 bottom-0 w-6 -ml-3 cursor-ew-resize flex items-center justify-center touch-none"
             style={{ left: `${endPct}%` }}
           >
             <div className="h-full w-1 rounded-full bg-signal" />
