@@ -9,15 +9,19 @@ import {
   Trash2,
   Loader2,
   SkipBack,
-  SkipForward
+  SkipForward,
+  Sparkles
 } from "lucide-react";
 import { useToast } from "@/components/ToastProvider";
+import TimelineTrack from "@/components/TimelineTrack";
 
 interface ClipData {
   id: string;
   startSec: number;
   endSec: number;
   title: string | null;
+  score?: number | null;
+  scoreBreakdown?: { reason?: string } | null;
 }
 
 function formatTime(sec: number): string {
@@ -32,17 +36,22 @@ function formatTime(sec: number): string {
 }
 
 const MIN_CLIP_LEN = 1;
+const IN_PROGRESS_STATUSES = ["TRANSCRIBING", "ANALYZING"];
 
 export default function ClipEditor({
   videoId,
   videoSrc,
   initialDurationSec,
-  initialClips
+  initialClips,
+  initialStatus,
+  initialStatusDetail
 }: {
   videoId: string;
   videoSrc: string;
   initialDurationSec: number | null;
   initialClips: ClipData[];
+  initialStatus: string;
+  initialStatusDetail: string | null;
 }) {
   const { showToast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -58,13 +67,70 @@ export default function ClipEditor({
   const [title, setTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [clips, setClips] = useState<ClipData[]>(initialClips);
+  const [status, setStatus] = useState(initialStatus);
+  const [statusDetail, setStatusDetail] = useState(initialStatusDetail);
+  const [requestingAnalysis, setRequestingAnalysis] = useState(false);
   const rafRef = useRef<number | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (pollRef.current) clearInterval(pollRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    const inProgress = IN_PROGRESS_STATUSES.includes(status);
+    if (!inProgress) {
+      if (pollRef.current) clearInterval(pollRef.current);
+      return;
+    }
+
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/videos/${videoId}/status`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setStatus(data.status);
+        setStatusDetail(data.statusDetail);
+        setClips(data.clips);
+        if (data.status === "READY") {
+          showToast(data.statusDetail ?? "Analysis complete", "success");
+        } else if (data.status === "FAILED") {
+          showToast(data.statusDetail ?? "Analysis failed", "error");
+        }
+      } catch {
+        // Silent — next poll retries.
+      }
+    }, 4000);
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [status, videoId, showToast]);
+
+  async function requestAnalysis() {
+    setRequestingAnalysis(true);
+    try {
+      const res = await fetch(`/api/videos/${videoId}/analyze`, { method: "POST" });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showToast(data.error ?? "Couldn't start analysis", "error");
+        setRequestingAnalysis(false);
+        return;
+      }
+
+      setStatus(data.status);
+      setStatusDetail("Starting…");
+      showToast("AI is analyzing your video — this can take a few minutes", "info");
+    } catch {
+      showToast("Couldn't start analysis. Try again.", "error");
+    } finally {
+      setRequestingAnalysis(false);
+    }
+  }
 
   const watchForPreviewEnd = useCallback(() => {
     const v = videoRef.current;
@@ -239,9 +305,33 @@ export default function ClipEditor({
   const startPct = duration > 0 ? (selStart / duration) * 100 : 0;
   const endPct = duration > 0 ? (selEnd / duration) * 100 : 0;
   const playheadPct = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const analysisInProgress = IN_PROGRESS_STATUSES.includes(status);
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between border border-ink-line rounded-xl px-4 py-3">
+        {analysisInProgress ? (
+          <TimelineTrack status={status} />
+        ) : (
+          <span className="text-xs font-mono text-muted">
+            {statusDetail || "Manually mark clips below, or let AI find them for you"}
+          </span>
+        )}
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={requestAnalysis}
+          disabled={analysisInProgress || requestingAnalysis}
+          className="flex items-center gap-2 bg-wave text-ink text-xs font-medium px-3 py-2 rounded-md hover:bg-wave/90 transition-colors disabled:opacity-60 shrink-0 ml-3"
+        >
+          {requestingAnalysis || analysisInProgress ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Sparkles className="h-3.5 w-3.5" />
+          )}
+          Find clips with AI
+        </motion.button>
+      </div>
+
       <div className="rounded-xl overflow-hidden border border-ink-line bg-black">
         <video
           ref={videoRef}
@@ -380,7 +470,7 @@ export default function ClipEditor({
 
         {clips.length === 0 ? (
           <p className="text-muted text-sm">
-            No clips saved yet — drag the handles above and hit &quot;Save clip&quot;.
+            No clips saved yet — drag the handles above and hit &quot;Save clip&quot;, or let AI find them.
           </p>
         ) : (
           <AnimatePresence initial={false}>
@@ -402,9 +492,22 @@ export default function ClipEditor({
                   className="flex items-center gap-3 min-w-0 text-left"
                 >
                   <Play className="h-3.5 w-3.5 text-wave shrink-0" />
-                  <span className="text-sm truncate">
-                    {c.title || `Clip ${formatTime(c.startSec)}`}
-                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm truncate">
+                        {c.title || `Clip ${formatTime(c.startSec)}`}
+                      </span>
+                      {typeof c.score === "number" && (
+                        <span className="flex items-center gap-1 text-xs font-mono text-wave shrink-0">
+                          <Sparkles className="h-3 w-3" />
+                          {Math.round(c.score)}
+                        </span>
+                      )}
+                    </div>
+                    {c.scoreBreakdown?.reason && (
+                      <p className="text-xs text-muted mt-0.5 truncate">{c.scoreBreakdown.reason}</p>
+                    )}
+                  </div>
                   <span className="text-xs font-mono text-muted shrink-0">
                     {formatTime(c.startSec)}–{formatTime(c.endSec)}
                   </span>

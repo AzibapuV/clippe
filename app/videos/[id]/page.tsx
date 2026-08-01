@@ -58,12 +58,25 @@ export default async function VideoEditorPage({
             videoId={video.id}
             videoSrc={`/api/videos/${video.id}/file`}
             initialDurationSec={video.durationSec}
-            initialClips={video.clips.map((c: { id: string; startSec: number; endSec: number; title: string | null }) => ({
-              id: c.id,
-              startSec: c.startSec,
-              endSec: c.endSec,
-              title: c.title
-            }))}
+            initialStatus={video.status}
+            initialStatusDetail={video.statusDetail}
+            initialClips={video.clips.map(
+              (c: {
+                id: string;
+                startSec: number;
+                endSec: number;
+                title: string | null;
+                score: number | null;
+                scoreBreakdown: unknown;
+              }) => ({
+                id: c.id,
+                startSec: c.startSec,
+                endSec: c.endSec,
+                title: c.title,
+                score: c.score,
+                scoreBreakdown: c.scoreBreakdown as { reason?: string } | null
+              })
+            )}
           />
         ) : (
           <div className="border border-dashed border-ink-line rounded-xl p-10 text-center">
