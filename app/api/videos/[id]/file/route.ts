@@ -23,6 +23,23 @@ function mimeForKey(storageKey: string): string {
   return MIME_TYPES[ext] ?? "video/mp4";
 }
 
+const ownershipCache = new Map<string, { storageKey: string; expires: number }>();
+const CACHE_TTL_MS = 30_000;
+
+async function getOwnedStorageKey(videoId: string, userId: string): Promise<string | null> {
+  const cacheKey = `${userId}:${videoId}`;
+  const cached = ownershipCache.get(cacheKey);
+  if (cached && cached.expires > Date.now()) {
+    return cached.storageKey;
+  }
+
+  const video = await prisma.video.findFirst({ where: { id: videoId, project: { userId } } });
+  if (!video || !video.storageKey) return null;
+
+  ownershipCache.set(cacheKey, { storageKey: video.storageKey, expires: Date.now() + CACHE_TTL_MS });
+  return video.storageKey;
+}
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -35,15 +52,12 @@ export async function GET(
   const { id } = await params;
   const userId = (session.user as { id: string }).id;
 
-  const video = await prisma.video.findFirst({
-    where: { id, project: { userId } }
-  });
-
-  if (!video || !video.storageKey) {
+  const storageKey = await getOwnedStorageKey(id, userId);
+  if (!storageKey) {
     return NextResponse.json({ error: "Video not found" }, { status: 404 });
   }
 
-  const absolutePath = absolutePathForKey(video.storageKey);
+  const absolutePath = absolutePathForKey(storageKey);
 
   let fileStat;
   try {
@@ -57,7 +71,7 @@ export async function GET(
 
   const fileSize = fileStat.size;
   const range = req.headers.get("range");
-  const mimeType = mimeForKey(video.storageKey);
+  const mimeType = mimeForKey(storageKey);
 
   if (range) {
     const match = /bytes=(\d*)-(\d*)/.exec(range);
