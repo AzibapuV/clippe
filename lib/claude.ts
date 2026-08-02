@@ -1,6 +1,6 @@
 import type { TranscriptSentence } from "@/lib/assemblyai";
 
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_URL = process.env.CLAUDE_API_BASE_URL || "https://api.anthropic.com/v1/messages";
 const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-5";
 const MAX_CLIPS = 6;
 
