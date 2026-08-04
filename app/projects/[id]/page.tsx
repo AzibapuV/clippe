@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ArrowLeft, Scissors } from "lucide-react";
 import AddVideoForm from "@/components/AddVideoForm";
+import DeleteProjectButton from "@/components/DeleteProjectButton";
 import VideoList from "@/components/VideoList";
 
 export default async function ProjectPage({
@@ -41,11 +42,14 @@ export default async function ProjectPage({
       </header>
 
       <div className="max-w-4xl mx-auto px-6 py-12 flex flex-col gap-8">
-        <div>
-          <h1 className="font-display font-bold text-2xl">{project.name}</h1>
-          <p className="text-xs text-muted font-mono mt-1">
-            Created {new Date(project.createdAt).toLocaleDateString()}
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="font-display font-bold text-2xl">{project.name}</h1>
+            <p className="text-xs text-muted font-mono mt-1">
+              Created {new Date(project.createdAt).toLocaleDateString()}
+            </p>
+          </div>
+          <DeleteProjectButton projectId={project.id} projectName={project.name} />
         </div>
 
         <AddVideoForm projectId={project.id} />
